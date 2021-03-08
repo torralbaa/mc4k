@@ -9,69 +9,77 @@
 
 package mc4k;
 
-import java.awt.Panel;
 import java.awt.Frame;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
-import java.awt.event.WindowEvent;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.awt.image.ImageObserver;
+import java.awt.event.WindowEvent;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.io.FileInputStream;
 import java.io.ObjectInputStream;
 import java.io.IOException;
-import java.util.Random;
-import java.util.Scanner;
-import java.time.Instant;
+import java.io.Serializable;
+import java.net.URL;
+import javax.swing.ImageIcon;
+import javax.imageio.ImageIO;
 
-public class Minecraft4K extends Panel implements Runnable, MouseMotionListener, MouseListener, KeyListener {
-	private int mouseLocked = 0;
-	private int[] eventMap = new int[32767];
-	private static Frame frame = new Frame();
+import mc4k.MCApplet;
+import mc4k.MCTerrainGenerator;
+import mc4k.MCPlayer;
 
+public class Minecraft4K extends MCApplet implements Runnable {
 	int imageWidth = 214 * 2;
 	int imageHeight = 120 * 2;
 	int screenWidth = 856 * 1;
 	int screenHeigth = 480 * 1;
 
-	Random random = new Random();
 	BufferedImage screenImage = new BufferedImage(imageWidth, imageHeight, 1);
 
+	int worldSize = 64 * 64 * 64;
+	int textureSize = 12288;
 	int[] screenImagePixels = ((DataBufferInt)screenImage.getRaster().getDataBuffer()).getData();
-	int[] worldBlocks = new int[262144];
-	int[] texturePixels = new int[12288];
+	int[] worldBlocks = new int[worldSize];
+	int[] texturePixels = new int[textureSize];
 
-	float posX = 96.5F;
-	float posZ = 95.0F;
-	float posY = 96.5F;
-
-	int blockInHand = 1;
-	int eventIndicator = 0;
 	float viewFov = 3F;
 	double DRAW_DISTANCE = 20.0D;
 
+	String playerFile = "player.dat";
 	String worldFile = "world.dat";
+	String texturesFile = "textures.dat";
+
+	MCPlayer player = new MCPlayer();
+	MCTerrainGenerator generator = new MCTerrainGenerator();
 
 	public static void main(String[] args) {
 		Minecraft4K mc4k = new Minecraft4K();
-		mc4k.setSize(840, 480);
+		mc4k.setSize(856, 480);
 		frame.add(mc4k);
 		frame.pack();
 		mc4k.start();
-		frame.setSize(840, 480);
-		frame.show();
+		frame.setSize(856, 480);
+		frame.setTitle("mc4k - Minecraft 4k");
+		frame.setResizable(false);
+
+		URL iconURL = Minecraft4K.class.getResource("/res/icon.png");
+		if (iconURL != null) {
+			ImageIcon icon = new ImageIcon(iconURL);
+			frame.setIconImage(icon.getImage());
+		}
+
+		frame.setVisible(true);
 		frame.addWindowListener(new java.awt.event.WindowAdapter() {
 			public void windowClosing(java.awt.event.WindowEvent e) {
 				mc4k.fileSave(mc4k.worldFile, mc4k.worldBlocks);
+				mc4k.playerSave(mc4k.playerFile, mc4k.player);
 				System.exit(0);
 			};
 		});
-
 	}
 
 	public void start() {
@@ -79,21 +87,26 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 		addMouseMotionListener(this);
 		addMouseListener(this);
 		addKeyListener(this);
-		random.setSeed(Instant.now().getEpochSecond());
 
 		try {
-			texturePixels = resourceLoad("textures.dat", texturePixels.length);
+			texturePixels = resourceLoad(texturesFile, textureSize);
 		} catch (Exception err)
 		{
 			frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
 			err.printStackTrace();
 		}
 
-		for(int i = 0; i < 262144; ++i) {
-//			worldBlocks[i] = i / 64 % 64 > 32?random.nextInt(8) + 1:0;
-			worldBlocks[i] = i / 64 % 64 > 32?4:0;
+		try {
+			worldBlocks = fileLoad(worldFile, worldSize);
+		} catch (Exception err) {
+			worldBlocks = generator.getBlocks();
 		}
 
+		try {
+			player = playerLoad(playerFile);
+		} catch (Exception err) {
+			return;
+		}
 	}
 
 	public void run() {
@@ -120,6 +133,9 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 			int smthWithCameraX;
 			int smthWithCameraZ;
 			int smthWithCameraY;
+
+			String diamondsString = "Diamonds: " + player.diamondCounter;
+			Graphics graphics = screenImage.getGraphics();
 
 			for (smthWithCameraY = 0; smthWithCameraY < imageWidth; ++smthWithCameraY) {
 				float otherVelocityY = (float)(smthWithCameraY - imageWidth / 2) / 90.0F;
@@ -148,11 +164,11 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 						float smthWithBlockTextureDrawXAxis = smthStretchX * smthWithBlockSideDraw;
 						float smthWithBlockTextureDrawZAxis = smthStretchZ * smthWithBlockSideDraw;
 						float smthWithBlockTextureDrawYAxis = smthStretchY * smthWithBlockSideDraw;
-						float smthWithBlockTextureMovement = posX - (float)((int)posX);
+						float smthWithBlockTextureMovement = player.posX - (float)((int)player.posX);
 						if (smthWithTopAndBottomOfBlockDraw == 1) {
-							smthWithBlockTextureMovement = posZ - (float)((int)posZ);
+							smthWithBlockTextureMovement = player.posZ - (float)((int)player.posZ);
 						} else if (smthWithTopAndBottomOfBlockDraw == 2) {
-							smthWithBlockTextureMovement = posY - (float)((int)posY);
+							smthWithBlockTextureMovement = player.posY - (float)((int)player.posY);
 						}
 
 						if (smthWithBlockSide > 0.0F) {
@@ -160,9 +176,9 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 						}
 
 						float smthWithDistanceFade = smthWithBlockSideDraw * smthWithBlockTextureMovement;
-						float smthWithBlockXPos = posX + smthWithBlockTextureDrawXAxis * smthWithBlockTextureMovement;
-						float smthWithBlockZPos = posZ + smthWithBlockTextureDrawZAxis * smthWithBlockTextureMovement;
-						float smthWithBlockYPos = posY + smthWithBlockTextureDrawYAxis * smthWithBlockTextureMovement;
+						float smthWithBlockXPos = player.posX + smthWithBlockTextureDrawXAxis * smthWithBlockTextureMovement;
+						float smthWithBlockZPos = player.posZ + smthWithBlockTextureDrawZAxis * smthWithBlockTextureMovement;
+						float smthWithBlockYPos = player.posY + smthWithBlockTextureDrawYAxis * smthWithBlockTextureMovement;
 						if (smthWithBlockSide < 0.0F) {
 							if (smthWithTopAndBottomOfBlockDraw == 0) {
 								--smthWithBlockXPos;
@@ -197,10 +213,15 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 								int smthWithBlockDrawingColor = 0x333333; // Block outline color
 
 								if (blockIndex != blockThatYouLookOn || smthWithXandYDrawAxis > 0 && smthWithZDrawAxis % 16 > 0 && smthWithXandYDrawAxis < 15 && smthWithZDrawAxis % 16 < 15) {
-									smthWithBlockDrawingColor = texturePixels[smthWithXandYDrawAxis + smthWithZDrawAxis * 16 + blockIDToDraw * 256 * 3];
+									try {
+										smthWithBlockDrawingColor = texturePixels[smthWithXandYDrawAxis + smthWithZDrawAxis * 16 + blockIDToDraw * 256 * 3];
+									} catch (Exception err) {
+										System.out.println("Failed to load textures for block " + blockIDToDraw + ".");
+										smthWithBlockDrawingColor = 0x000000;
+									}
 								}
 
-								if (smthWithDistanceFade < blockReach && smthWithCameraY == this.eventMap[2] / 2 && smthWithCameraX == this.eventMap[3] / 2) {
+								if (smthWithDistanceFade < blockReach && smthWithCameraY == events.mouseX / 2 && smthWithCameraX == events.mouseY / 2) {
 									smthWithMouseAndBlockChoice = (float)blockIndex;
 									byte var65 = 1;
 									if (smthWithBlockSide > 0.0F) {
@@ -238,48 +259,73 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 			} catch (InterruptedException err) {
 				err.printStackTrace();
 			}
+
+			graphics.setColor(Color.WHITE);
+			graphics.setFont(new Font("", Font.BOLD, 10));
+			graphics.drawString(diamondsString, 8, 210);
 			this.getGraphics().drawImage(screenImage, 0, 0, screenWidth, screenHeigth, (ImageObserver)null);
 
-			if (mouseLocked == 0) {
+			if (events.mouseLocked != 0) {
 				continue;
 			}
 
-			// Save world
-			if (this.eventMap[71] == 1) { // 'G'
-				fileSave(worldFile, worldBlocks);
+			// Close
+			if (events.worldKeys[0] == 1) { // Esc
+				frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
+				events.worldKeys[0] = 0;
 			}
 
 			// Load world
-			if (this.eventMap[67] == 1) { // 'C'
+			if (events.worldKeys[1] == 1) { // 'C'
 				try {
-					worldBlocks = fileLoad(worldFile, worldBlocks.length);
+					worldBlocks = fileLoad(worldFile, worldSize);
 				} catch (Exception err) {
 					err.printStackTrace();
 				}
+				events.worldKeys[1] = 0;
 			}
 
-			// Close
-			if (this.eventMap[27] == 1) { // Esc
-				frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
+			// Save world
+			if (events.worldKeys[2] == 1) { // 'G'
+				fileSave(worldFile, worldBlocks);
+				events.worldKeys[2] = 0;
+			}
+
+			// Screenshot
+			if (events.worldKeys[3] == 1) { // F2
+				try {
+					File screenshotFile = new File("mc4k_screenshot.png");
+					ImageIO.write(screenImage, "png", screenshotFile);
+					System.out.println("mc4k_scrot.png saved");
+				} catch (Exception err) {
+					err.printStackTrace();
+				}
+				events.worldKeys[3] = 0;
 			}
 
 			// Chose block to place
-			if (this.eventMap[39] == 1) {
-				if (blockInHand < 15) {
-					blockInHand++;
-				} else {
-					blockInHand = 1;
-				}
-				this.eventMap[99] = 0;
-			}
-			if (this.eventMap[37] == 1) {
-				if (blockInHand > 1) {
-					blockInHand--;
+			if (events.arrows[0] == 1) {
+				if (player.blockInHand > 1) {
+					player.blockInHand--;
+					if (player.blockInHand == 3 && player.diamondCounter <= 0) {
+						player.blockInHand--;
+					}
 				} else
 				{
-					blockInHand = 15;
+					player.blockInHand = 15;
 				}
-				this.eventMap[97] = 0;
+				events.arrows[0] = 0;
+			}
+			if (events.arrows[1] == 1) {
+				if (player.blockInHand < 15) {
+					player.blockInHand++;
+					if (player.blockInHand == 3 && player.diamondCounter <= 0) {
+						player.blockInHand++;
+					}
+				} else {
+					player.blockInHand = 1;
+				}
+				events.arrows[1] = 0;
 			}
 
 			// Movement
@@ -292,14 +338,9 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 					float velocityY;
 
 					// Mouse stuff
-					if (this.eventMap[102] == 1 || this.eventMap[100] == 1 || this.eventMap[98] == 1 || this.eventMap[104] == 1) {
-						moveX = (this.eventMap[102] - this.eventMap[100]) * 4;
-						moveY = (this.eventMap[98] - this.eventMap[104]) * 4;
-					} else {
-						if (this.eventMap[2] > 0) {
-							moveX = (float)(this.eventMap[2] - screenWidth / 2) / (screenWidth / 4) * 2.0F;
-							moveY = (float)(this.eventMap[3] - screenHeigth / 2) / (screenHeigth / 4) * 2.0F;
-						}
+					if (events.mouseX > 0) {
+						moveX = (float)(events.mouseX - screenWidth / 2) / (screenWidth / 4) * 2.0F;
+						moveY = (float)(events.mouseY - screenHeigth / 2) / (screenHeigth / 4) * 2.0F;
 					}
 
 					float viewRotationSpeed = (float)Math.sqrt((double)(moveX * moveX + moveY * moveY)) - 1.2F;
@@ -324,8 +365,8 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 					moveX = 0.0F;
 					moveY = 0.0F;
 
-					moveY += (float)(this.eventMap[87] - this.eventMap[83]) * 0.02F;
-					moveX += (float)(this.eventMap[68] - this.eventMap[65]) * 0.02F;
+					moveY += (float)(events.wasd[0] - events.wasd[2]) * 0.02F;
+					moveX += (float)(events.wasd[3] - events.wasd[1]) * 0.02F;
 
 					moveVelocityX *= 0.5F;
 					moveVelocityZ *= 0.99F;
@@ -335,9 +376,9 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 					moveVelocityZ += 0.003F;
 
 					for (smthWithCameraX = 0; smthWithCameraX < 3; ++smthWithCameraX) {
-						velocityX = posX + moveVelocityX * (float)((smthWithCameraX + 2) % 3 / 2);
-						velocityZ = posZ + moveVelocityZ * (float)((smthWithCameraX + 1) % 3 / 2);
-						velocityY = posY + moveVelocityY * (float)((smthWithCameraX + 2) % 3 / 2);
+						velocityX = player.posX + moveVelocityX * (float)((smthWithCameraX + 2) % 3 / 2);
+						velocityZ = player.posZ + moveVelocityZ * (float)((smthWithCameraX + 1) % 3 / 2);
+						velocityY = player.posY + moveVelocityY * (float)((smthWithCameraX + 2) % 3 / 2);
 
 						for (int i = 0; i < 12; ++i) {
 							int coordinateX = (int)(velocityX + (float)(i >> 0 & 1) * 0.6F - 0.3F) - 64;
@@ -348,8 +389,8 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 							if (coordinateX < 0 || coordinateZ < 0 || coordinateY < 0 || coordinateX >= 64 || coordinateZ >= 64 || coordinateY >= 64 || worldBlocks[coordinateX + coordinateZ * 64 + coordinateY * 4096] > 0) {
 								if (smthWithCameraX == 1) {
 									// Jumping
-									if (this.eventMap[32] > 0 && moveVelocityZ > 0.0F) {
-										this.eventMap[32] = 0;
+									if (events.space > 0 && moveVelocityZ > 0.0F) {
+										events.space = 0;
 										moveVelocityZ = -0.1F;
 									} else {
 										moveVelocityZ = 0.0F;
@@ -358,30 +399,39 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 								continue movement_label;
 							}
 						}
-						posX = velocityX;
-						posZ = velocityZ;
-						posY = velocityY;
+						player.posX = velocityX;
+						player.posZ = velocityZ;
+						player.posY = velocityY;
 					}
 				}
 
 			// Remove block
-			if ((this.eventMap[0] > 0 || this.eventMap[103] == 1) && blockThatYouLookOn > 0) {
+			if (events.buttons[0] > 0 && blockThatYouLookOn > 0) {
+				if (worldBlocks[blockThatYouLookOn] == 3) {
+					player.diamondCounter++;
+				}
 				worldBlocks[blockThatYouLookOn] = 0;
-				this.eventMap[0] = 0;
-				this.eventMap[103] = 0;
+				events.buttons[0] = 0;
 			}
 
 			// Place block
-			if ((this.eventMap[1] > 0 || this.eventMap[105] == 1) && blockThatYouLookOn > 0) {
-				worldBlocks[blockThatYouLookOn + blockNextToOneThatYouLookOn] = blockInHand;
-				this.eventMap[1] = 0;
-				this.eventMap[105] = 0;
+			if (events.buttons[1] > 0 && blockThatYouLookOn > 0) {
+				worldBlocks[blockThatYouLookOn + blockNextToOneThatYouLookOn] = player.blockInHand;
+				if (player.blockInHand == 3)
+				{
+					player.diamondCounter--;
+					if (player.diamondCounter <= 0)
+					{
+						player.blockInHand++;
+					}
+				}
+				events.buttons[1] = 0;
 			}
 
 			for (int i = 0; i < 12; ++i) {
-				smthWithCameraY = (int)(posX + (float)(i >> 0 & 1) * 0.6F - 0.3F) - 64;
-				smthWithCameraZ = (int)(posZ + (float)((i >> 2) - 1) * 0.8F + 0.65F) - 64;
-				smthWithCameraX = (int)(posY + (float)(i >> 1 & 1) * 0.6F - 0.3F) - 64;
+				smthWithCameraY = (int)(player.posX + (float)(i >> 0 & 1) * 0.6F - 0.3F) - 64;
+				smthWithCameraZ = (int)(player.posZ + (float)((i >> 2) - 1) * 0.8F + 0.65F) - 64;
+				smthWithCameraX = (int)(player.posY + (float)(i >> 1 & 1) * 0.6F - 0.3F) - 64;
 				if (smthWithCameraY >= 0 && smthWithCameraZ >= 0 && smthWithCameraX >= 0 && smthWithCameraY < 64 && smthWithCameraZ < 64 && smthWithCameraX < 64) {
 					worldBlocks[smthWithCameraY + smthWithCameraZ * 64 + smthWithCameraX * 4096] = 0;
 				}
@@ -412,72 +462,37 @@ public class Minecraft4K extends Panel implements Runnable, MouseMotionListener,
 		return loadedFile;
 	}
 
+	public void playerSave(String fileName, MCPlayer playerToSave) {
+		ObjectOutputStream out = null;
+		try {
+			out = new ObjectOutputStream(new FileOutputStream(fileName));
+			out.writeObject(playerToSave);
+			out.close();
+			System.out.println(fileName + " saved");
+		} catch (Exception err) {
+			err.printStackTrace();
+		}
+	}
+
+	public MCPlayer playerLoad(String fileName) throws Exception {
+		MCPlayer loadedPlayer = new MCPlayer();
+		ObjectInputStream in = null;
+
+		in = new ObjectInputStream(new FileInputStream(fileName));
+		loadedPlayer = (MCPlayer)in.readObject();
+		in.close();
+		System.out.println(fileName + " loaded");
+		return loadedPlayer;
+	}
+
 	public int[] resourceLoad(String resourceName, int arrayLength) throws Exception {
 		int[] loadedFile = new int[arrayLength];
 		ObjectInputStream in = null;
 
-		in = new ObjectInputStream(getClass().getResourceAsStream("/res/" + resourceName));
+		in = new ObjectInputStream(Minecraft4K.class.getResourceAsStream("/res/" + resourceName));
 		loadedFile = (int[])in.readObject();
 		in.close();
 		System.out.println(resourceName + " loaded");
 		return loadedFile;
-	}
-
-	public void mouseDragged(MouseEvent paramEvent) {
-		eventMap[2] = paramEvent.getX();
-		eventMap[3] = paramEvent.getY();
-	}
-
-	public void mouseMoved(MouseEvent paramEvent) {
-		eventMap[2] = paramEvent.getX();
-		eventMap[3] = paramEvent.getY();
-	}
-
-	public void mouseExited(MouseEvent e) {
-		eventMap[2] = screenWidth / 2;
-		eventMap[3] = screenHeigth / 2;
-	}
-
-	public void mousePressed(MouseEvent paramEvent) {
-		eventIndicator = 1;
-		eventMap[2] = paramEvent.getX();
-		eventMap[3] = paramEvent.getY();
-		if ((paramEvent.getModifiers() & 4) > 0)
-			eventMap[1] = eventIndicator;
-		else
-			eventMap[0] = eventIndicator;
-	}
-
-	public void keyPressed(KeyEvent paramEvent) {
-		eventIndicator = 1;
-		eventMap[paramEvent.getKeyCode()] = eventIndicator;
-	}
-
-	public void keyReleased(KeyEvent paramEvent) {
-		eventIndicator = 0;
-		eventMap[paramEvent.getKeyCode()] = eventIndicator;
-	}
-
-	@Override
-	public void mouseClicked(MouseEvent paramEvent) {
-		if (mouseLocked == 0) {
-			mouseLocked = 1;
-		}
-		return;
-	}
-
-	@Override
-	public void mouseEntered(MouseEvent e) {
-		return;
-	}
-
-	@Override
-	public void mouseReleased(MouseEvent paramEvent) {
-		return;
-	}
-
-	@Override
-	public void keyTyped(KeyEvent paramEvent) {
-		return;
 	}
 }

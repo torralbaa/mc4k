@@ -1,0 +1,6 @@
+# Builds
+build/
+
+# Player and world data
+player.dat
+world.dat
