@@ -9,14 +9,18 @@ package mc4k;
 
 import java.awt.Panel;
 import java.awt.Frame;
+import java.awt.Robot;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.awt.image.ImageObserver;
+import javax.swing.JFrame;
 
 class MCEvents {
 	public int mouseX = 0;
@@ -27,16 +31,25 @@ class MCEvents {
 	public int[] worldKeys = new int[4]; // Esc, C, G, F2
 	public int space = 0; // Space
 	public int mouseLocked = 1; // 0: Locked, 1: Game not started, 2: Focus lost
+	public int mouseWheel = 0;
 }
 
-public class MCApplet extends Panel implements MouseMotionListener, MouseListener, KeyListener {
+public class MCApplet extends Panel implements MouseMotionListener, MouseListener, KeyListener, MouseWheelListener {
 	public MCEvents events = new MCEvents();
-	public static Frame frame = new Frame();
+	public static Robot robot;
+	public static JFrame frame = new JFrame();
+
+	int imageWidth = 214 * 2;
+	int imageHeight = 120 * 2;
+	int screenWidth = 856 * 1;
+	int screenHeigth = 480 * 1;
+
+	int centerX = screenWidth / 2;
+	int centerY = screenHeigth / 2;
 
 	@Override
 	public void mouseDragged(MouseEvent paramEvent) {
-		if (events.mouseLocked != 0)
-		{
+		if (events.mouseLocked != 0) {
 			return;
 		}
 		events.mouseX = paramEvent.getX();
@@ -45,8 +58,7 @@ public class MCApplet extends Panel implements MouseMotionListener, MouseListene
 
 	@Override
 	public void mouseMoved(MouseEvent paramEvent) {
-		if (events.mouseLocked != 0)
-		{
+		if (events.mouseLocked != 0) {
 			return;
 		}
 		events.mouseX = paramEvent.getX();
@@ -55,8 +67,7 @@ public class MCApplet extends Panel implements MouseMotionListener, MouseListene
 
 	@Override
 	public void mousePressed(MouseEvent paramEvent) {
-		if (events.mouseLocked != 0)
-		{
+		if (events.mouseLocked != 0) {
 			return;
 		}
 		events.mouseX = paramEvent.getX();
@@ -117,6 +128,7 @@ public class MCApplet extends Panel implements MouseMotionListener, MouseListene
 
 	@Override
 	public void mouseExited(MouseEvent paramEvent) {
+		events.mouseLocked = 2;
 		return;
 	}
 
@@ -130,12 +142,21 @@ public class MCApplet extends Panel implements MouseMotionListener, MouseListene
 
 	@Override
 	public void mouseEntered(MouseEvent paramEvent) {
+		if (events.mouseLocked == 2) {
+			events.mouseLocked = 0;
+			robot.mouseMove(centerX + frame.getX(), centerY + frame.getY());
+		}
 		return;
 	}
 
 	@Override
 	public void mouseReleased(MouseEvent paramEvent) {
 		return;
+	}
+
+	@Override
+	public void mouseWheelMoved(MouseWheelEvent paramEvent) {
+		events.mouseWheel = paramEvent.getWheelRotation();
 	}
 
 	@Override

@@ -13,10 +13,15 @@ import java.awt.Frame;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Robot;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.awt.image.ImageObserver;
 import java.awt.event.WindowEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.ComponentAdapter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
@@ -33,10 +38,8 @@ import mc4k.MCTerrainGenerator;
 import mc4k.MCPlayer;
 
 public class Minecraft4K extends MCApplet implements Runnable {
-	int imageWidth = 214 * 2;
-	int imageHeight = 120 * 2;
-	int screenWidth = 856 * 1;
-	int screenHeigth = 480 * 1;
+	// v0.2.0, MAJOR * 1000 + MINOR * 100 + PATCH * 10 + RC
+	private static final long versionCode = 0 * 1000 + 3 * 100 + 0 * 10 + 0;
 
 	BufferedImage screenImage = new BufferedImage(imageWidth, imageHeight, 1);
 
@@ -48,6 +51,7 @@ public class Minecraft4K extends MCApplet implements Runnable {
 
 	float viewFov = 3F;
 	double DRAW_DISTANCE = 20.0D;
+	int texturesLoaded = 1;
 
 	String playerFile = "player.dat";
 	String worldFile = "world.dat";
@@ -59,12 +63,15 @@ public class Minecraft4K extends MCApplet implements Runnable {
 	public static void main(String[] args) {
 		Minecraft4K mc4k = new Minecraft4K();
 		mc4k.setSize(856, 480);
+
 		frame.add(mc4k);
 		frame.pack();
 		mc4k.start();
+
 		frame.setSize(856, 480);
 		frame.setTitle("mc4k - Minecraft 4k");
 		frame.setResizable(false);
+		frame.setVisible(true);
 
 		URL iconURL = Minecraft4K.class.getResource("/res/icon.png");
 		if (iconURL != null) {
@@ -72,9 +79,15 @@ public class Minecraft4K extends MCApplet implements Runnable {
 			frame.setIconImage(icon.getImage());
 		}
 
-		frame.setVisible(true);
-		frame.addWindowListener(new java.awt.event.WindowAdapter() {
-			public void windowClosing(java.awt.event.WindowEvent e) {
+		try {
+			robot = new Robot();
+		} catch (Exception err) {
+			err.printStackTrace();
+			System.exit(-1);
+		}
+
+		frame.addWindowListener(new WindowAdapter() {
+			public void windowClosing(WindowEvent paramEvent) {
 				mc4k.fileSave(mc4k.worldFile, mc4k.worldBlocks);
 				mc4k.playerSave(mc4k.playerFile, mc4k.player);
 				System.exit(0);
@@ -87,13 +100,24 @@ public class Minecraft4K extends MCApplet implements Runnable {
 		addMouseMotionListener(this);
 		addMouseListener(this);
 		addKeyListener(this);
+		addMouseWheelListener(this);
 
 		try {
-			texturePixels = resourceLoad(texturesFile, textureSize);
+			texturePixels = fileLoad(texturesFile, textureSize);
+			texturesLoaded = 0;
 		} catch (Exception err)
 		{
-			frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
-			err.printStackTrace();
+			System.out.println("Custom textures not found, falling back to built-in ones.");
+		}
+		if (texturesLoaded != 0)
+		{
+			try {
+				texturePixels = resourceLoad(texturesFile, textureSize);
+			} catch (Exception err) {
+				err.printStackTrace();
+				System.out.println("Failed to load textures.");
+				frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
+			}
 		}
 
 		try {
@@ -120,12 +144,12 @@ public class Minecraft4K extends MCApplet implements Runnable {
 		long lastTimeStamp = System.currentTimeMillis();
 		int blockThatYouLookOn = -1;
 		int blockNextToOneThatYouLookOn = 0;
-		float viewRotationSpeedHorisontalAxis = 0.0F;
+		float viewRotationSpeedHorizontalAxis = 0.0F;
 		float viewRotationSpeedVerticalAxis = 0.0F;
 
 		while (true) {
-			float smthWithHorisontalAxisSin = (float)Math.sin((double)viewRotationSpeedHorisontalAxis);
-			float smthWithHorisontalAxisCos = (float)Math.cos((double)viewRotationSpeedHorisontalAxis);
+			float smthWithHorizontalAxisSin = (float)Math.sin((double)viewRotationSpeedHorizontalAxis);
+			float smthWithHorizontalAxisCos = (float)Math.cos((double)viewRotationSpeedHorizontalAxis);
 			float smthWithVerticalAxisSin = (float)Math.sin((double)viewRotationSpeedVerticalAxis);
 			float smthWithVerticalAxisCos = (float)Math.cos((double)viewRotationSpeedVerticalAxis);
 
@@ -134,7 +158,7 @@ public class Minecraft4K extends MCApplet implements Runnable {
 			int smthWithCameraZ;
 			int smthWithCameraY;
 
-			String diamondsString = "Diamonds: " + player.diamondCounter;
+			String diamondsString = "Diamonds: " + player.diamondCounter + ", Block: " + player.blockInHand;
 			Graphics graphics = screenImage.getGraphics();
 
 			for (smthWithCameraY = 0; smthWithCameraY < imageWidth; ++smthWithCameraY) {
@@ -143,8 +167,8 @@ public class Minecraft4K extends MCApplet implements Runnable {
 					float viewAngle = (float)(smthWithCameraX - imageHeight / 2) / 90.0F;
 					float smthStretchXandY = viewFov * smthWithVerticalAxisCos + viewAngle * smthWithVerticalAxisSin;
 					float smthStretchZ = viewAngle * smthWithVerticalAxisCos - viewFov * smthWithVerticalAxisSin;
-					float smthStretchX = otherVelocityY * smthWithHorisontalAxisCos + smthStretchXandY * smthWithHorisontalAxisSin;
-					float smthStretchY = smthStretchXandY * smthWithHorisontalAxisCos - otherVelocityY * smthWithHorisontalAxisSin;
+					float smthStretchX = otherVelocityY * smthWithHorizontalAxisCos + smthStretchXandY * smthWithHorizontalAxisSin;
+					float smthStretchY = smthStretchXandY * smthWithHorizontalAxisCos - otherVelocityY * smthWithHorizontalAxisSin;
 					int smthWithBlockColor = 0;
 					int smthOverallColor = 255;
 					double drawDistance = DRAW_DISTANCE;
@@ -217,7 +241,7 @@ public class Minecraft4K extends MCApplet implements Runnable {
 										smthWithBlockDrawingColor = texturePixels[smthWithXandYDrawAxis + smthWithZDrawAxis * 16 + blockIDToDraw * 256 * 3];
 									} catch (Exception err) {
 										System.out.println("Failed to load textures for block " + blockIDToDraw + ".");
-										smthWithBlockDrawingColor = 0x000000;
+										smthWithBlockDrawingColor = 0x550000;
 									}
 								}
 
@@ -304,28 +328,33 @@ public class Minecraft4K extends MCApplet implements Runnable {
 			}
 
 			// Chose block to place
-			if (events.arrows[0] == 1) {
-				if (player.blockInHand > 1) {
+			if (events.mouseWheel != 0) {
+				player.blockInHand += events.mouseWheel;
+				if (player.blockInHand == 3 && player.diamondCounter <= 0) {
+					player.blockInHand += events.mouseWheel;
+				}
+				events.mouseWheel = 0;
+			} else {
+				if (events.arrows[0] == 1) {
 					player.blockInHand--;
 					if (player.blockInHand == 3 && player.diamondCounter <= 0) {
 						player.blockInHand--;
 					}
-				} else
-				{
-					player.blockInHand = 15;
+					events.arrows[0] = 0;
 				}
-				events.arrows[0] = 0;
-			}
-			if (events.arrows[1] == 1) {
-				if (player.blockInHand < 15) {
+				if (events.arrows[1] == 1) {
 					player.blockInHand++;
 					if (player.blockInHand == 3 && player.diamondCounter <= 0) {
 						player.blockInHand++;
 					}
-				} else {
-					player.blockInHand = 1;
+					events.arrows[1] = 0;
 				}
-				events.arrows[1] = 0;
+			}
+			if (player.blockInHand <= 0) {
+				player.blockInHand = 1;
+			} else if (player.blockInHand > 15)
+			{
+				player.blockInHand = 15;
 			}
 
 			// Movement
@@ -349,7 +378,7 @@ public class Minecraft4K extends MCApplet implements Runnable {
 						viewRotationSpeed = 0.0F;
 					}
 					if (viewRotationSpeed > 0.0F) {
-						viewRotationSpeedHorisontalAxis += moveX * viewRotationSpeed / 400.0F;
+						viewRotationSpeedHorizontalAxis += moveX * viewRotationSpeed / 400.0F;
 						viewRotationSpeedVerticalAxis -= moveY * viewRotationSpeed / 400.0F;
 						if (viewRotationSpeedVerticalAxis < -1.57F) {
 							viewRotationSpeedVerticalAxis = -1.57F;
@@ -371,8 +400,8 @@ public class Minecraft4K extends MCApplet implements Runnable {
 					moveVelocityX *= 0.5F;
 					moveVelocityZ *= 0.99F;
 					moveVelocityY *= 0.5F;
-					moveVelocityX += smthWithHorisontalAxisSin * moveY + smthWithHorisontalAxisCos * moveX;
-					moveVelocityY += smthWithHorisontalAxisCos * moveY - smthWithHorisontalAxisSin * moveX;
+					moveVelocityX += smthWithHorizontalAxisSin * moveY + smthWithHorizontalAxisCos * moveX;
+					moveVelocityY += smthWithHorizontalAxisCos * moveY - smthWithHorizontalAxisSin * moveX;
 					moveVelocityZ += 0.003F;
 
 					for (smthWithCameraX = 0; smthWithCameraX < 3; ++smthWithCameraX) {
@@ -390,8 +419,8 @@ public class Minecraft4K extends MCApplet implements Runnable {
 								if (smthWithCameraX == 1) {
 									// Jumping
 									if (events.space > 0 && moveVelocityZ > 0.0F) {
-										events.space = 0;
 										moveVelocityZ = -0.1F;
+										events.space = 0;
 									} else {
 										moveVelocityZ = 0.0F;
 									}

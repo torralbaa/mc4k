@@ -31,8 +31,8 @@ java -jar ./build/Minecraft4K.jar
 
 ## Controls
  + Movement: `"WASD"`
- + Next block: Left arrow
- + Previous block: Right arrow
+ + Next block: Mouse wheel, left arrow
+ + Previous block: Mouse wheel, right arrow
  + Save world: `'G'`
  + Load world: `'C'`
  + Quit: `Esc`
@@ -50,6 +50,7 @@ java -jar ./build/Minecraft4K.jar
  + Made small changes and fixes to the way the GUI works and looks.
  + Added automatic world and player data saving on exit.
  + Added screenshot feature.
+ + Fixed some bugs.
 
 Both player and world data, and screenshots, are saved to the current directory.
 
