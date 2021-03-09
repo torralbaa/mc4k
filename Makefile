@@ -11,6 +11,5 @@ config:
 	mkdir -p ./build/mc4k/
 	mkdir -p ./build/res/
 	cp ./res/manifest_minecraft4k.txt ./build/
-	cp ./res/manifest_launcher.txt ./build/
 	cp ./res/textures.dat ./build/res/
 	cp ./res/icon.png ./build/res/
