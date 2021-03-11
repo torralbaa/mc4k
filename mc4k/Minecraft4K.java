@@ -9,12 +9,7 @@
 
 package mc4k;
 
-import java.awt.Frame;
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Robot;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.awt.image.ImageObserver;
@@ -27,69 +22,104 @@ import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.io.FileInputStream;
 import java.io.ObjectInputStream;
-import java.io.IOException;
 import java.io.Serializable;
 import java.net.URL;
-import javax.swing.ImageIcon;
 import javax.imageio.ImageIO;
 
 import mc4k.MCApplet;
 import mc4k.MCTerrainGenerator;
 import mc4k.MCPlayer;
+import mc4k.MCSettings;
+import mc4k.MCFrame;
 
 public class Minecraft4K extends MCApplet implements Runnable {
-	// v0.2.0, MAJOR * 1000 + MINOR * 100 + PATCH * 10 + RC
-	private static final long versionCode = 0 * 1000 + 3 * 100 + 0 * 10 + 0;
+	// v0.4.0, MAJOR * 1000 + MINOR * 100 + PATCH * 10 + RC
+	private static final long versionCode = 0 * 1000 + 4 * 100 + 0 * 10 + 0;
 
-	BufferedImage screenImage = new BufferedImage(imageWidth, imageHeight, 1);
+	BufferedImage screenImage;
 
 	int worldSize = 64 * 64 * 64;
 	int textureSize = 12288;
-	int[] screenImagePixels = ((DataBufferInt)screenImage.getRaster().getDataBuffer()).getData();
+	int[] screenImagePixels;
 	int[] worldBlocks = new int[worldSize];
 	int[] texturePixels = new int[textureSize];
 
 	float viewFov = 3F;
 	double DRAW_DISTANCE = 20.0D;
 	int texturesLoaded = 1;
+	boolean showHUD = true;
 
-	String playerFile = "player.dat";
-	String worldFile = "world.dat";
+	String playerFileName = "player.dat";
+	String worldFileName = "world.dat";
 	String texturesFile = "textures.dat";
 
 	MCPlayer player = new MCPlayer();
 	MCTerrainGenerator generator = new MCTerrainGenerator();
 
 	public static void main(String[] args) {
+		MCSettings settings = new MCSettings();
 		Minecraft4K mc4k = new Minecraft4K();
-		mc4k.setSize(856, 480);
 
-		frame.add(mc4k);
-		frame.pack();
-		mc4k.start();
-
-		frame.setSize(856, 480);
-		frame.setTitle("mc4k - Minecraft 4k");
-		frame.setResizable(false);
-		frame.setVisible(true);
-
-		URL iconURL = Minecraft4K.class.getResource("/res/icon.png");
-		if (iconURL != null) {
-			ImageIcon icon = new ImageIcon(iconURL);
-			frame.setIconImage(icon.getImage());
+		if (args.length > 0) {
+			try {
+				mc4k.scale = Float.parseFloat(args[0]);
+				if (mc4k.scale < 1) {
+					mc4k.scale = 1;
+				}
+				mc4k.imageWidth = (int)(mc4k.imageWidth * mc4k.scale);
+				mc4k.imageHeight = (int)(mc4k.imageHeight * mc4k.scale);
+				mc4k.screenWidth = (int)(mc4k.screenWidth * mc4k.scale);
+				mc4k.screenHeight = (int)(mc4k.screenHeight * mc4k.scale);
+			} catch (Exception err) {
+				System.out.println("Hmm... That doesn't look like a valid scale.");
+			}
 		}
 
+		mc4k.screenImage = new BufferedImage(mc4k.imageWidth, mc4k.imageHeight, 1);
+		mc4k.screenImagePixels = ((DataBufferInt)mc4k.screenImage.getRaster().getDataBuffer()).getData();
+
+		mc4k.setSize(mc4k.screenWidth, mc4k.screenHeight);
+		settings.setSize(mc4k.screenWidth, mc4k.screenHeight);
+
+		settings.frame = new MCFrame(mc4k.screenWidth, mc4k.screenHeight, settings);
+		settings.start();
+
+		mc4k.frame = new MCFrame(mc4k.screenWidth, mc4k.screenHeight, mc4k);
+
+		mc4k.frame.setVisible(false);
+		settings.frame.setVisible(true);
+		settings.frame.other = mc4k.frame;
+		settings.requestFocus();
+
 		try {
-			robot = new Robot();
+			mc4k.robot = new Robot();
 		} catch (Exception err) {
 			err.printStackTrace();
 			System.exit(-1);
 		}
 
-		frame.addWindowListener(new WindowAdapter() {
+		mc4k.initialized = 0;
+		settings.frame.addWindowListener(new WindowAdapter() {
 			public void windowClosing(WindowEvent paramEvent) {
-				mc4k.fileSave(mc4k.worldFile, mc4k.worldBlocks);
-				mc4k.playerSave(mc4k.playerFile, mc4k.player);
+				if (!settings.runMC) {
+					mc4k.frame.dispose();
+					settings.frame.dispose();
+					System.exit(0);
+				}
+				mc4k.worldFileName = settings.worldDirectoryName + "/world.dat";
+				mc4k.playerFileName = settings.worldDirectoryName + "/player.dat";
+				mc4k.frame.setLocation(settings.frame.getX(), settings.frame.getY());
+				mc4k.frame.setVisible(true);
+				mc4k.requestFocus();
+				mc4k.start();
+			};
+		});
+		mc4k.frame.addWindowListener(new WindowAdapter() {
+			public void windowClosing(WindowEvent paramEvent) {
+				if (mc4k.initialized == 0) {
+					mc4k.fileSave(mc4k.worldFileName, mc4k.worldBlocks);
+					mc4k.playerSave(mc4k.playerFileName, mc4k.player);
+				}
 				System.exit(0);
 			};
 		});
@@ -121,13 +151,13 @@ public class Minecraft4K extends MCApplet implements Runnable {
 		}
 
 		try {
-			worldBlocks = fileLoad(worldFile, worldSize);
+			worldBlocks = fileLoad(worldFileName, worldSize);
 		} catch (Exception err) {
 			worldBlocks = generator.getBlocks();
 		}
 
 		try {
-			player = playerLoad(playerFile);
+			player = playerLoad(playerFileName);
 		} catch (Exception err) {
 			return;
 		}
@@ -159,6 +189,7 @@ public class Minecraft4K extends MCApplet implements Runnable {
 			int smthWithCameraY;
 
 			String diamondsString = "Diamonds: " + player.diamondCounter + ", Block: " + player.blockInHand;
+			String coordsString = "Pos " + (int)player.posX + ", " + (int)player.posY + ", " + (int)player.posZ;
 			Graphics graphics = screenImage.getGraphics();
 
 			for (smthWithCameraY = 0; smthWithCameraY < imageWidth; ++smthWithCameraY) {
@@ -284,10 +315,14 @@ public class Minecraft4K extends MCApplet implements Runnable {
 				err.printStackTrace();
 			}
 
-			graphics.setColor(Color.WHITE);
-			graphics.setFont(new Font("", Font.BOLD, 10));
-			graphics.drawString(diamondsString, 8, 210);
-			this.getGraphics().drawImage(screenImage, 0, 0, screenWidth, screenHeigth, (ImageObserver)null);
+			if (showHUD) {
+				graphics.setColor(Color.WHITE);
+				graphics.setFont(new Font("", Font.BOLD, 8));
+				graphics.drawString(coordsString, 8, (int)(8 * scale));
+				graphics.setFont(new Font("", Font.BOLD, 10));
+				graphics.drawString(diamondsString, 8, (int)(210 * scale));
+			}
+			this.getGraphics().drawImage(screenImage, 0, 0, screenWidth, screenHeight, (ImageObserver)null);
 
 			if (events.mouseLocked != 0) {
 				continue;
@@ -296,23 +331,20 @@ public class Minecraft4K extends MCApplet implements Runnable {
 			// Close
 			if (events.worldKeys[0] == 1) { // Esc
 				frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
-				events.worldKeys[0] = 0;
 			}
 
 			// Load world
 			if (events.worldKeys[1] == 1) { // 'C'
 				try {
-					worldBlocks = fileLoad(worldFile, worldSize);
+					worldBlocks = fileLoad(worldFileName, worldSize);
 				} catch (Exception err) {
 					err.printStackTrace();
 				}
-				events.worldKeys[1] = 0;
 			}
 
 			// Save world
 			if (events.worldKeys[2] == 1) { // 'G'
-				fileSave(worldFile, worldBlocks);
-				events.worldKeys[2] = 0;
+				fileSave(worldFileName, worldBlocks);
 			}
 
 			// Screenshot
@@ -324,7 +356,12 @@ public class Minecraft4K extends MCApplet implements Runnable {
 				} catch (Exception err) {
 					err.printStackTrace();
 				}
-				events.worldKeys[3] = 0;
+			}
+
+			// Show/hide HUD
+			if (events.worldKeys[4] == 1) {
+				showHUD = !showHUD;
+				events.worldKeys[4] = 0;
 			}
 
 			// Chose block to place
@@ -340,14 +377,12 @@ public class Minecraft4K extends MCApplet implements Runnable {
 					if (player.blockInHand == 3 && player.diamondCounter <= 0) {
 						player.blockInHand--;
 					}
-					events.arrows[0] = 0;
 				}
 				if (events.arrows[1] == 1) {
 					player.blockInHand++;
 					if (player.blockInHand == 3 && player.diamondCounter <= 0) {
 						player.blockInHand++;
 					}
-					events.arrows[1] = 0;
 				}
 			}
 			if (player.blockInHand <= 0) {
@@ -369,7 +404,7 @@ public class Minecraft4K extends MCApplet implements Runnable {
 					// Mouse stuff
 					if (events.mouseX > 0) {
 						moveX = (float)(events.mouseX - screenWidth / 2) / (screenWidth / 4) * 2.0F;
-						moveY = (float)(events.mouseY - screenHeigth / 2) / (screenHeigth / 4) * 2.0F;
+						moveY = (float)(events.mouseY - screenHeight / 2) / (screenHeight / 4) * 2.0F;
 					}
 
 					float viewRotationSpeed = (float)Math.sqrt((double)(moveX * moveX + moveY * moveY)) - 1.2F;

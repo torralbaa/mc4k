@@ -8,7 +8,6 @@
 package mc4k;
 
 import java.awt.Panel;
-import java.awt.Frame;
 import java.awt.Robot;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -17,10 +16,8 @@ import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelListener;
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferInt;
-import java.awt.image.ImageObserver;
-import javax.swing.JFrame;
+
+import mc4k.MCFrame;
 
 class MCEvents {
 	public int mouseX = 0;
@@ -28,7 +25,7 @@ class MCEvents {
 	public int[] wasd = new int[4]; // WASD
 	public int[] buttons = new int[2]; // Left, Right
 	public int[] arrows = new int[2]; // Left, Right
-	public int[] worldKeys = new int[4]; // Esc, C, G, F2
+	public int[] worldKeys = new int[5]; // Esc, C, G, F2, F1
 	public int space = 0; // Space
 	public int mouseLocked = 1; // 0: Locked, 1: Game not started, 2: Focus lost
 	public int mouseWheel = 0;
@@ -37,15 +34,18 @@ class MCEvents {
 public class MCApplet extends Panel implements MouseMotionListener, MouseListener, KeyListener, MouseWheelListener {
 	public MCEvents events = new MCEvents();
 	public static Robot robot;
-	public static JFrame frame = new JFrame();
+	public static MCFrame frame;
 
 	int imageWidth = 214 * 2;
 	int imageHeight = 120 * 2;
-	int screenWidth = 856 * 1;
-	int screenHeigth = 480 * 1;
+	int screenWidth = 856;
+	int screenHeight = 480;
+	float scale = 1F;
 
 	int centerX = screenWidth / 2;
-	int centerY = screenHeigth / 2;
+	int centerY = screenHeight / 2;
+
+	int initialized = 1;
 
 	@Override
 	public void mouseDragged(MouseEvent paramEvent) {
@@ -91,6 +91,11 @@ public class MCApplet extends Panel implements MouseMotionListener, MouseListene
 			break;
 			case 113:
 				events.worldKeys[3] = val;
+			break;
+			case 112:
+				if (val == 1) {
+					events.worldKeys[4] = 1;
+				}
 			break;
 			case 37:
 				events.arrows[0] = val;
