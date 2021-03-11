@@ -24,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.net.URL;
+import java.net.SocketAddress;
 import javax.imageio.ImageIO;
 
 import mc4k.MCApplet;
@@ -32,16 +33,20 @@ import mc4k.MCPlayer;
 import mc4k.MCSettings;
 import mc4k.MCFrame;
 
+import mc4k.api.MCPIServer;
+
 public class Minecraft4K extends MCApplet implements Runnable {
-	// v0.4.0, MAJOR * 1000 + MINOR * 100 + PATCH * 10 + RC
-	private static final long versionCode = 0 * 1000 + 4 * 100 + 0 * 10 + 0;
+	// v0.5.0, MAJOR * 1000 + MINOR * 100 + PATCH * 10 + RC
+	public static final int versionCode = 0 * 1000 + 5 * 100 + 0 * 10 + 0;
 
 	BufferedImage screenImage;
 
-	int worldSize = 64 * 64 * 64;
+	public int worldSize = 64 * 64 * 64;
+	public int[] worldBlocks = new int[worldSize];
+	public boolean worldImmutable = false;
+
 	int textureSize = 12288;
 	int[] screenImagePixels;
-	int[] worldBlocks = new int[worldSize];
 	int[] texturePixels = new int[textureSize];
 
 	float viewFov = 3F;
@@ -49,12 +54,12 @@ public class Minecraft4K extends MCApplet implements Runnable {
 	int texturesLoaded = 1;
 	boolean showHUD = true;
 
-	String playerFileName = "player.dat";
-	String worldFileName = "world.dat";
-	String texturesFile = "textures.dat";
+	public String playerFileName = "player.dat";
+	public String worldFileName = "world.dat";
+	String texturesFileName = "textures.dat";
 
-	MCPlayer player = new MCPlayer();
-	MCTerrainGenerator generator = new MCTerrainGenerator();
+	public MCPlayer player = new MCPlayer();
+	public MCTerrainGenerator generator = new MCTerrainGenerator();
 
 	public static void main(String[] args) {
 		MCSettings settings = new MCSettings();
@@ -119,6 +124,10 @@ public class Minecraft4K extends MCApplet implements Runnable {
 				if (mc4k.initialized == 0) {
 					mc4k.fileSave(mc4k.worldFileName, mc4k.worldBlocks);
 					mc4k.playerSave(mc4k.playerFileName, mc4k.player);
+					File oldWorldFile = new File(mc4k.worldFileName + ".old");
+					if (oldWorldFile.exists()) {
+						oldWorldFile.delete();
+					}
 				}
 				System.exit(0);
 			};
@@ -133,16 +142,14 @@ public class Minecraft4K extends MCApplet implements Runnable {
 		addMouseWheelListener(this);
 
 		try {
-			texturePixels = fileLoad(texturesFile, textureSize);
+			texturePixels = fileLoad(texturesFileName, textureSize);
 			texturesLoaded = 0;
-		} catch (Exception err)
-		{
+		} catch (Exception err) {
 			System.out.println("Custom textures not found, falling back to built-in ones.");
 		}
-		if (texturesLoaded != 0)
-		{
+		if (texturesLoaded != 0) {
 			try {
-				texturePixels = resourceLoad(texturesFile, textureSize);
+				texturePixels = resourceLoad(texturesFileName, textureSize);
 			} catch (Exception err) {
 				err.printStackTrace();
 				System.out.println("Failed to load textures.");
@@ -160,6 +167,12 @@ public class Minecraft4K extends MCApplet implements Runnable {
 			player = playerLoad(playerFileName);
 		} catch (Exception err) {
 			return;
+		}
+
+		try {
+			MCPIServer mcpiServer = new MCPIServer("0.0.0.0", 4711, this);
+		} catch (Exception err) {
+			err.printStackTrace();
 		}
 	}
 
@@ -189,7 +202,7 @@ public class Minecraft4K extends MCApplet implements Runnable {
 			int smthWithCameraY;
 
 			String diamondsString = "Diamonds: " + player.diamondCounter + ", Block: " + player.blockInHand;
-			String coordsString = "Pos " + (int)player.posX + ", " + (int)player.posY + ", " + (int)player.posZ;
+			String coordsString = "Pos " + (int)(player.posX - 64) + ", " + (int)(player.posY - 64) + ", " + (int)(64 - (player.posZ - 64));
 			Graphics graphics = screenImage.getGraphics();
 
 			for (smthWithCameraY = 0; smthWithCameraY < imageWidth; ++smthWithCameraY) {
@@ -334,9 +347,10 @@ public class Minecraft4K extends MCApplet implements Runnable {
 			}
 
 			// Load world
-			if (events.worldKeys[1] == 1) { // 'C'
+			if (events.worldKeys[1] == 1 && !worldImmutable) { // 'C'
 				try {
 					worldBlocks = fileLoad(worldFileName, worldSize);
+					player = playerLoad(playerFileName);
 				} catch (Exception err) {
 					err.printStackTrace();
 				}
@@ -345,6 +359,7 @@ public class Minecraft4K extends MCApplet implements Runnable {
 			// Save world
 			if (events.worldKeys[2] == 1) { // 'G'
 				fileSave(worldFileName, worldBlocks);
+				playerSave(playerFileName, player);
 			}
 
 			// Screenshot
@@ -470,7 +485,7 @@ public class Minecraft4K extends MCApplet implements Runnable {
 				}
 
 			// Remove block
-			if (events.buttons[0] > 0 && blockThatYouLookOn > 0) {
+			if (events.buttons[0] > 0 && blockThatYouLookOn > 0 && !worldImmutable) {
 				if (worldBlocks[blockThatYouLookOn] == 3) {
 					player.diamondCounter++;
 				}
@@ -479,7 +494,7 @@ public class Minecraft4K extends MCApplet implements Runnable {
 			}
 
 			// Place block
-			if (events.buttons[1] > 0 && blockThatYouLookOn > 0) {
+			if (events.buttons[1] > 0 && blockThatYouLookOn > 0 && !worldImmutable) {
 				worldBlocks[blockThatYouLookOn + blockNextToOneThatYouLookOn] = player.blockInHand;
 				if (player.blockInHand == 3)
 				{

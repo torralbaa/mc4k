@@ -2,6 +2,7 @@ VERSION:=v0.4.0
 
 all: config
 	javac -Xlint:deprecation -d ./build/ ./mc4k/*.java
+	javac -Xlint:deprecation -d ./build/ ./mc4k/api/*.java
 	cd build && jar cfm Minecraft4K.jar manifest_minecraft4k.txt mc4k/* res/*
 
 config:

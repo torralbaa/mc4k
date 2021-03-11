@@ -34,9 +34,11 @@ public class MCSettings extends Panel implements Runnable, KeyListener {
 
 	String titleString = "mc4k - Minecraft 4k";
 	String worldNameLabelString = "World name: ";
+	String versionString = versionCodeToString(Minecraft4K.versionCode);
 	int titleWidth = 0;
 	int worldNameWidth = 0;
 	int worldNameLabelWidth = 0;
+	int versionWidth = 0;
 	int width = 0;
 	int height = 0;
 	int i = 1;
@@ -69,6 +71,7 @@ public class MCSettings extends Panel implements Runnable, KeyListener {
 		titleWidth = graphics.getFontMetrics().stringWidth(titleString);
 		graphics.setFont(inputFont);
 		worldNameLabelWidth = graphics.getFontMetrics().stringWidth(worldNameLabelString);
+		versionWidth = graphics.getFontMetrics().stringWidth(versionString);
 		(new Thread(this)).start();
 		addKeyListener(this);
 	}
@@ -82,6 +85,7 @@ public class MCSettings extends Panel implements Runnable, KeyListener {
 			graphics.setFont(inputFont);
 			graphics.drawString(worldNameLabelString, width / 2 - worldNameLabelWidth, 110);
 			graphics.drawString(inputBuffer.toString(), width / 2, 110);
+			graphics.drawString(versionString, width - 8 - versionWidth, height - 32);
 			worldNameWidth = graphics.getFontMetrics().stringWidth(inputBuffer.toString());
 			if (i % 25 != 0) {
 				graphics.drawRect(width / 2 + worldNameWidth + 2, 95, 6, 15);
@@ -110,6 +114,22 @@ public class MCSettings extends Panel implements Runnable, KeyListener {
 		} else if (!directory.exists()) {
 			directory.mkdir();
 		}
+	}
+
+	public String versionCodeToString(int versionCode) {
+		int major = ((versionCode % 10000) - (versionCode % 10000) % 1000) / 1000;
+		int minor = ((versionCode % 1000) - (versionCode % 1000) % 100) / 100;
+		int patch = ((versionCode % 100) - (versionCode % 100) % 10) / 10;
+		int rc = (versionCode % 10);
+		StringBuffer versionBuffer = new StringBuffer("v");
+
+		versionBuffer.append(String.valueOf(major) + ".");
+		versionBuffer.append(String.valueOf(minor) + ".");
+		versionBuffer.append(String.valueOf(patch));
+		if (rc > 0) {
+			versionBuffer.append("-rc" + String.valueOf(rc));
+		}
+		return versionBuffer.toString();
 	}
 
 	@Override

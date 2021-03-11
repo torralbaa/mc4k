@@ -72,10 +72,11 @@ public class MCApplet extends Panel implements MouseMotionListener, MouseListene
 		}
 		events.mouseX = paramEvent.getX();
 		events.mouseY = paramEvent.getY();
-		if ((paramEvent.getModifiers() & 4) <= 0)
+		if ((paramEvent.getModifiers() & 4) <= 0) {
 			events.buttons[0] = 1;
-		else
+		} else {
 			events.buttons[1] = 1;
+		}
 	}
 
 	private void setKeyEvent(KeyEvent paramEvent, int val) {
@@ -156,6 +157,16 @@ public class MCApplet extends Panel implements MouseMotionListener, MouseListene
 
 	@Override
 	public void mouseReleased(MouseEvent paramEvent) {
+		if (events.mouseLocked != 0) {
+			return;
+		}
+		events.mouseX = paramEvent.getX();
+		events.mouseY = paramEvent.getY();
+		if ((paramEvent.getModifiers() & 4) <= 0) {
+			events.buttons[0] = 0;
+		} else {
+			events.buttons[1] = 0;
+		}
 		return;
 	}
 
