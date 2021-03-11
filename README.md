@@ -37,6 +37,7 @@ java -jar ./build/Minecraft4K.jar
  + Load world: `'C'`
  + Quit: `Esc`
  + Screenshot: `F2`
+ + Show/hide HUD: `F1`
 
 ## Changes
  + Ported the code from a Java Applet to a Java application.
@@ -50,9 +51,17 @@ java -jar ./build/Minecraft4K.jar
  + Made small changes and fixes to the way the GUI works and looks.
  + Added automatic world and player data saving on exit.
  + Added screenshot feature.
+ + Added external textures support.
+ + Added multiple worlds support.
+ + Added basic HUD and show/hide HUD keys.
+ + Added support for a `scale` command line argument.
  + Fixed some bugs.
 
-Both player and world data, and screenshots, are saved to the current directory.
+Player and world data are saved under `$HOME/.mc4k` (UNIX-like systems) or `%APPDATA%\.mc4k` (Windows). Screenshots, are saved to the current directory. To change the game scale on startup, execute it from the command line, like:
+```sh
+JAVA_CMD -jar JAR SCALE
+```
+Where `JAVA_CMD` is the command or path to Java, `JAR` is the path to the `Minecraft4K.jar` file, and `SCALE` is a floating point value equal to or greater than `1.0`.
 
 ## Credits and licensing
 I don't even know from where the original code comes, but I downloaded it from a [post](https://www.minecraftforum.net/forums/mapping-and-modding-java-edition/minecraft-mods/1290821-minecraft-4k-improved-by-crunchycat-download-now?comment=60) in the MCForums. It looks like it was a modified version of the original reverse-engineered Minecraft 4K code.
